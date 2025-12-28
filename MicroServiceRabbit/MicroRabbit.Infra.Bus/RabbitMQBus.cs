@@ -53,7 +53,7 @@ namespace MicroRabbit.Infra.Bus
             {
                 _handlers.Add(eventName, new List<Type>());
             }
-            if (_handlers[eventName].Any(s => s.GetType() == handlerType))
+            if (_handlers[eventName].Any(s => s == handlerType))
             {
                 throw new ArgumentException($"Handler Type {handlerType.Name} already registered for '{eventName}'", nameof(handlerType));
             }
@@ -99,10 +99,17 @@ namespace MicroRabbit.Infra.Bus
                 {
                     var handler = Activator.CreateInstance(subscription);
                     if (handler == null) continue;
+
                     var eventType = _eventTypes.SingleOrDefault(t => t.Name == eventName);
+                    if (eventType == null) continue;
+
                     var @event = JsonSerializer.Deserialize(message, eventType!);
+                    if (@event == null) continue;
+
                     var concreteType = typeof(IEventHandler<>).MakeGenericType(eventType!);
-                    await (Task)concreteType.GetMethod("Handle")!.Invoke(handler, [@event])!;
+                    var handleMethod = concreteType.GetMethod("Handle");
+                    if (handleMethod == null) continue;
+                    await (Task)handleMethod.Invoke(handler, [@event])!;
                 }
             }
         }
